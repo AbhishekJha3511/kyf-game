@@ -2,7 +2,7 @@ import { db } from "@/lib/db/supabase";
 import { notFound } from "next/navigation";
 import { ShareCard } from "@/components/shared/share-card";
 import { LeaderboardTable, type LeaderboardEntry } from "@/components/shared/leaderboard-table";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, LayoutDashboard } from "lucide-react";
 import Link from "next/link";
 
 interface HostDashboardProps {
@@ -12,10 +12,8 @@ interface HostDashboardProps {
 }
 
 export default async function HostDashboardPage({ params }: HostDashboardProps) {
-  // 1. Resolve dynamic path variables asynchronously matching Next.js specifications
   const { quizId } = await params;
 
-  // 2. Query target quiz record
   const { data: quiz, error: quizError } = await db
     .from("quizzes")
     .select("id, host_name")
@@ -23,10 +21,9 @@ export default async function HostDashboardPage({ params }: HostDashboardProps) 
     .single();
 
   if (quizError || !quiz) {
-    return notFound(); // Automatically maps execution timeline straight to global 404 sheets
+    return notFound();
   }
 
-  // 3. Query associated guest leaderboard responses ordered by score
   const { data: responses } = await db
     .from("guest_responses")
     .select("id, guest_name, score, total_questions, completed_at")
@@ -37,31 +34,42 @@ export default async function HostDashboardPage({ params }: HostDashboardProps) 
   const entries: LeaderboardEntry[] = responses || [];
 
   return (
-    <main className="min-h-screen w-full bg-slate-50/50 p-4 sm:p-6 flex flex-col items-center">
-      <div className="w-full max-w-xl space-y-6 py-6 sm:py-10">
+    <main className="min-h-screen w-full bg-white text-zinc-50 p-4 sm:p-6 flex flex-col items-center relative overflow-x-hidden">
+      
+      {/* Decorative fine-grain ambient gradient light overlay to match onboarding accent rules */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[-10%] right-[-10%] w-[400px] h-[400px] rounded-full bg-violet-900/15 blur-3xl" />
+      </div>
+
+      <div className="w-full max-w-xl space-y-6 py-8 sm:py-12 z-10">
         
-        {/* Simple navigation line */}
+        {/* Navigation Action Hook */}
         <Link 
           href="/" 
-          className="inline-flex items-center text-xs font-bold text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-wider gap-1"
+          className="inline-flex items-center text-[10px] font-bold text-zinc-500 hover:text-zinc-200 transition-colors uppercase tracking-widest gap-1"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           Create New Quiz
         </Link>
 
-        <div className="space-y-1">
-          <h2 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+        {/* Header Branding Row */}
+        <div className="space-y-2">
+          <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-[10px] font-bold text-purple-400 tracking-wider uppercase shadow-sm">
+            <LayoutDashboard className="w-3 h-3" />
+            <span>Admin Control Panel</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-500 leading-tight">
             {quiz.host_name}&apos;s Game Hub
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500 font-medium">
-            Live scoreboard tracking panel. Keep this page open or bookmark it to watch responses roll in.
+          <p className="text-xs sm:text-sm text-zinc-500 font-medium leading-relaxed">
+            Live metrics tracker deck. Keep this page open or save it to monitor your custom quiz results as your friends lock in their responses.
           </p>
         </div>
 
-        {/* Share utilities module */}
+        {/* Share Utility Control Block Card */}
         <ShareCard quizId={quiz.id} hostName={quiz.host_name} />
 
-        {/* Sorted response board matrix */}
+        {/* Sorted Dynamic Scoring List Table */}
         <LeaderboardTable entries={entries} />
         
       </div>

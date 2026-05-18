@@ -2,39 +2,29 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/core/button";
 import { Input } from "@/components/core/input";
 import { sampleRandomQuestions, type PresetQuestion } from "@/lib/constants/questions";
 import { createQuiz } from "@/app/actions/quiz";
 import { useLocalStorage } from "@/hooks/use-local-storage";
-import { Shuffle } from "lucide-react";
+import { Shuffle, Sparkles, Zap, ArrowLeft } from "lucide-react";
 
 type WizardStep = "IDENTITY" | "QUESTIONS";
 
-interface ConfiguredQuestion {
-  questionText: string;
-  correctAnswer: string;
-  sortOrder: number;
-}
-
 export function QuizWizard() {
   const router = useRouter();
-  
-  // Local persistence link to remember ownership safely without accounts
   const [, setOwnership] = useLocalStorage<Record<string, string>>("kyf_owned_quizzes", {});
 
-  // Step state machine variables
   const [step, setStep] = React.useState<WizardStep>("IDENTITY");
   const [hostName, setHostName] = React.useState("");
   const [nameError, setNameError] = React.useState("");
   
-  // Question configuration management matrices
   const [questions, setQuestions] = React.useState<PresetQuestion[]>([]);
   const [answers, setAnswers] = React.useState<Record<number, string>>({});
   const [submissionError, setSubmissionError] = React.useState("");
   const [isDeploying, setIsDeploying] = React.useState(false);
 
-  // Phase 1: Initialize the session with 10 random questions on step progression
   const handleProceedToQuestions = (e: React.FormEvent) => {
     e.preventDefault();
     if (!hostName.trim() || hostName.trim().length < 2) {
@@ -46,29 +36,20 @@ export function QuizWizard() {
     setStep("QUESTIONS");
   };
 
-  // Utility to let the host re-roll their entire question sheet instantly
   const handleReshuffleQuestions = () => {
     setQuestions(sampleRandomQuestions(10));
-    setAnswers({}); // Flush answers to prevent stale inputs matching mismatched indices
+    setAnswers({});
   };
 
-  const handleAnswerChange = (questionId: number, value: string) => {
-    setAnswers((prev) => ({ ...prev, [questionId]: value }));
-  };
-
-  // Phase 2: Transmit configuration to server context
   const handleLaunchGame = async () => {
     setSubmissionError("");
-    
-    // Defensive check: Ensure all 10 inputs are fully satisfied
     const nonBlankAnswers = questions.filter((q) => answers[q.id]?.trim());
     if (nonBlankAnswers.length < 10) {
-      setSubmissionError("Please fill out the answers to all 10 questions before launching.");
+      setSubmissionError("Please fill out all 10 question blocks before deploying.");
       return;
     }
 
     setIsDeploying(true);
-
     const payload = {
       hostName: hostName.trim(),
       questions: questions.map((q, idx) => ({
@@ -79,112 +60,139 @@ export function QuizWizard() {
     };
 
     const result = await createQuiz(payload);
-
     if (!result.success || !result.quizId || !result.ownerToken) {
-      setSubmissionError(result.error || "An internal transaction failure occurred.");
+      setSubmissionError(result.error || "An internal transaction error occurred.");
       setIsDeploying(false);
       return;
     }
 
-    // Persist ownership record locally before rerouting to dashboard
-    setOwnership((prev) => ({
-      ...prev,
-      [result.quizId!]: result.ownerToken!,
-    }));
-
-    // Perform atomic router push onto our operational Host Control Deck
+    setOwnership((prev) => ({ ...prev, [result.quizId!]: result.ownerToken! }));
     router.push(`/host/${result.quizId}`);
   };
 
-  // --- RENDERING ROUTINES ---
-
-  if (step === "IDENTITY") {
-    return (
-      <form onSubmit={handleProceedToQuestions} className="w-full max-w-md mx-auto p-6 space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
-            Know Your Friends!
-          </h1>
-          <p className="text-slate-500 text-sm sm:text-base">
-            How well do your friends actually know you? Let&apos;s build a flashcard test to find out.
-          </p>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-          <Input
-            label="What is your name?"
-            placeholder="e.g., Sarah"
-            value={hostName}
-            onChange={(e) => setHostName(e.target.value)}
-            error={nameError}
-            maxLength={50}
-            required
-          />
-          <Button type="submit" className="w-full">
-            Get Started
-          </Button>
-        </div>
-      </form>
-    );
-  }
-
   return (
-    <div className="w-full max-w-xl mx-auto p-4 sm:p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">Set Up Your Answers</h2>
-          <p className="text-xs text-slate-500">Answer honestly—your friends will guess these exact strings!</p>
-        </div>
-        <Button
-          variant="secondary"
-          type="button"
-          onClick={handleReshuffleQuestions}
-          className="self-start sm:self-center !min-h-[38px] text-xs h-auto py-1.5"
+    <AnimatePresence mode="wait">
+      {step === "IDENTITY" ? (
+        <motion.div
+          key="identity-panel"
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -15 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="w-full flex flex-col items-start text-left space-y-8 px-4"
         >
-          <Shuffle className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
-          Shuffle Questions
-        </Button>
-      </div>
-
-      <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1 sm:pr-2">
-        {questions.map((q, index) => (
-          <div
-            key={q.id}
-            className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-3"
-          >
-            <div className="flex items-start space-x-3">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600">
-                {index + 1}
-              </span>
-              <p className="text-sm font-semibold text-slate-800 pt-0.5">{q.text}</p>
+          {/* Hero Context Header Stack */}
+          <div className="space-y-4 max-w-xl">
+            <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-[11px] font-semibold text-purple-400 tracking-wide uppercase shadow-sm">
+              <Zap className="w-3 h-3 text-purple-400 fill-purple-400" />
+              <span>Viral trivia, zero friction</span>
             </div>
+            <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white leading-[1.05]">
+              How well do your friends actually know you?
+            </h1>
+            <p className="text-zinc-400 text-sm sm:text-base leading-relaxed font-medium max-w-lg">
+              Build a personal flashcard quiz in 60 seconds. Share the link. Watch the leaderboard expose who&apos;s been paying attention.
+            </p>
+          </div>
+
+          {/* Floating Form Glass Input Container */}
+          <form 
+            onSubmit={handleProceedToQuestions} 
+            className="w-full max-w-xl bg-zinc-900/30 backdrop-blur-md border border-zinc-900 p-6 rounded-2xl shadow-xl space-y-4"
+          >
             <Input
-              placeholder="Your answer..."
-              value={answers[q.id] || ""}
-              onChange={(e) => handleAnswerChange(q.id, e.target.value)}
-              maxLength={200}
+              label="What's your name?"
+              placeholder="e.g. Sarah"
+              value={hostName}
+              onChange={(e) => {
+                setHostName(e.target.value);
+                if (nameError) setNameError("");
+              }}
+              error={nameError}
+              maxLength={50}
               required
             />
-          </div>
-        ))}
-      </div>
-
-      {submissionError && (
-        <div className="p-4 rounded-xl bg-rose-50 text-sm font-semibold text-rose-600 border border-rose-100">
-          {submissionError}
-        </div>
-      )}
-
-      <div className="pt-2">
-        <Button
-          type="button"
-          onClick={handleLaunchGame}
-          isLoading={isDeploying}
-          className="w-full shadow-md bg-indigo-600 hover:bg-indigo-700"
+            <Button type="submit" className="w-full">
+              <Sparkles className="w-4 h-4 mr-2 text-violet-200 fill-violet-200" />
+              Start Building
+            </Button>
+            <div className="text-center text-[11px] text-zinc-600 font-medium tracking-wide">
+              No account • No email • Just a link
+            </div>
+          </form>
+        </motion.div>
+      ) : (
+        <motion.div
+          key="questions-panel"
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -15 }}
+          transition={{ duration: 0.3 }}
+          className="w-full max-w-xl mx-auto px-4 space-y-6"
         >
-          Generate Quiz Link
-        </Button>
-      </div>
-    </div>
+          <div className="flex items-center justify-between gap-4">
+            <button
+              onClick={() => setStep("IDENTITY")}
+              className="inline-flex items-center text-xs font-bold text-zinc-500 hover:text-zinc-200 transition-colors uppercase tracking-wider gap-1"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Back
+            </button>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={handleReshuffleQuestions}
+              className="h-9 px-4 text-xs font-semibold text-zinc-400 border-zinc-800 hover:bg-zinc-900"
+            >
+              <Shuffle className="w-3.5 h-3.5 mr-2 text-zinc-500" />
+              Shuffle Prompts
+            </Button>
+          </div>
+
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold tracking-tight text-zinc-100">Set Your Answers</h2>
+            <p className="text-xs text-zinc-500 font-medium">Your entries will be saved on the server as the ground truth answer key.</p>
+          </div>
+
+          <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1 scrollbar-thin">
+            {questions.map((q, idx) => (
+              <div
+                key={q.id}
+                className="bg-zinc-900/20 border border-zinc-900 p-5 rounded-xl space-y-3 transition-colors hover:border-zinc-800/60"
+              >
+                <div className="flex items-start space-x-3">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-zinc-900 border border-zinc-800 text-[10px] font-bold text-purple-400">
+                    {idx + 1}
+                  </span>
+                  <p className="text-sm font-semibold text-zinc-200 pt-0.5">{q.text}</p>
+                </div>
+                <Input
+                  placeholder="Lock in your answer..."
+                  value={answers[q.id] || ""}
+                  onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                  maxLength={200}
+                  required
+                />
+              </div>
+            ))}
+          </div>
+
+          {submissionError && (
+            <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-900/50 text-xs font-semibold text-rose-400">
+              {submissionError}
+            </div>
+          )}
+
+          <Button
+            type="button"
+            onClick={handleLaunchGame}
+            isLoading={isDeploying}
+            className="w-full shadow-lg"
+          >
+            Generate Quiz Link
+          </Button>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
