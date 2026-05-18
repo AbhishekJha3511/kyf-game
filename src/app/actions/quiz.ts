@@ -28,7 +28,7 @@ export async function createQuiz(rawInput: unknown): Promise<CreateQuizResult> {
     if (!parsed.success) {
       return { 
         success: false, 
-        error: parsed.error.errors[0]?.message || "Invalid quiz data setup." 
+        error: parsed.error.issues[0]?.message || "Invalid quiz data setup." 
       };
     }
 
@@ -94,7 +94,7 @@ export async function submitResponse(
     if (!parsed.success) {
       return { 
         success: false, 
-        error: parsed.error.errors[0]?.message || "Invalid submission structure." 
+        error: parsed.error.issues[0]?.message || "Invalid submission structure." 
       };
     }
 
